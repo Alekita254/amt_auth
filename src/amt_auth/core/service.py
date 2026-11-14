@@ -21,7 +21,7 @@ class AuthService:
     ) -> None:
         self._config = config
         self._validator = validator or TokenValidator(config)
-        self._admin = admin or AdminClient(config)
+        self.admin = admin or AdminClient(config)
 
     def validate_token(self, raw_jwt: str) -> TokenClaims:
         """Validate a raw JWT string and return parsed claims."""
@@ -36,8 +36,3 @@ class AuthService:
         Phase E: will honour the keycloak-orgs active-organization attribute.
         """
         return claims.active_organization
-
-    def onboard_user(self, *args, **kwargs) -> None:
-        raise NotImplementedError(
-            "onboard_user is implemented in Phase B (Django integration)."
-        )

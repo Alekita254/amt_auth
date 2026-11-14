@@ -14,7 +14,12 @@ class MirrorRepository(Protocol):
     def upsert_organization(self, id: str, name: str, synced_at: datetime) -> None: ...
     def soft_delete_organization(self, id: str, synced_at: datetime) -> None: ...
     def upsert_group(
-        self, id: str, name: str, organization_id: str, synced_at: datetime
+        self,
+        id: str,
+        name: str,
+        organization_id: str,
+        parent_id: str | None,
+        synced_at: datetime,
     ) -> None: ...
     def soft_delete_group(self, id: str, synced_at: datetime) -> None: ...
     def upsert_membership(
@@ -70,6 +75,7 @@ def _handle_group_upsert(event: dict, repo: MirrorRepository, synced_at: datetim
         id=r["id"],
         name=r["name"],
         organization_id=r["organizationId"],
+        parent_id=r.get("parentId"),
         synced_at=synced_at,
     )
 

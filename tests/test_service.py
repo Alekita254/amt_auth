@@ -45,10 +45,3 @@ def test_get_active_organization_none(amt_env):
     claims.active_organization = None
     svc = AuthService(cfg, validator=MagicMock(), admin=MagicMock())
     assert svc.get_active_organization(claims) is None
-
-
-def test_onboard_user_not_implemented(amt_env):
-    cfg = load_config(amt_env)
-    svc = AuthService(cfg, validator=MagicMock(), admin=MagicMock())
-    with pytest.raises(NotImplementedError):
-        svc.onboard_user()

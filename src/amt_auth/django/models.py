@@ -21,13 +21,29 @@ class Organization(Mirrored):
 
 
 class Group(Mirrored):
-    """A group inside an organization: a club, a mentorship, and so on."""
+    """A group inside an organization.
+
+    Each organization has top-level groups such as "clubs" and "mentorships";
+    the actual clubs and mentorships sit underneath, so the parent names the kind.
+    """
 
     id = models.CharField(primary_key=True, max_length=64)  # Keycloak group ID
     name = models.CharField(max_length=255)
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="groups"
     )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="children",
+        null=True,
+        blank=True,
+    )
+
+    @property
+    def kind(self) -> str | None:
+        """Name of the parent group, e.g. "clubs"; None for a top-level group."""
+        return self.parent.name if self.parent_id else None
 
     def __str__(self) -> str:
         return self.name
