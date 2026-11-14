@@ -11,9 +11,9 @@ import jwt
 from jwt.algorithms import RSAAlgorithm
 from jwt import PyJWKClient
 
-KID = "test-key-1"
-ISSUER = "http://localhost:8080/realms/amilliontechies"
-AUDIENCE = "amilliontechies-web"
+from tests.constants import AUDIENCE, ISSUER, KID
+
+__all__ = ["AUDIENCE", "ISSUER", "KID"]
 
 
 @pytest.fixture(scope="session")

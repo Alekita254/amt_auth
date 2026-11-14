@@ -29,3 +29,4 @@ packages = ["src/amt_auth"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

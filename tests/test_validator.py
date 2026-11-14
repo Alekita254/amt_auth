@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from amt_auth.core.config import load_config
 from amt_auth.core.validator import TokenValidator
 from amt_auth.exceptions import InvalidTokenError, TokenExpiredError
-from tests.conftest import AUDIENCE, ISSUER, KID
+from tests.constants import AUDIENCE, ISSUER, KID
 
 
 def _make_validator(amt_env: dict, fake_jwks_client) -> TokenValidator:
