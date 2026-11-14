@@ -1,6 +1,6 @@
 # amt-auth
 
-Python authentication library for the A Million Techies ecosystem. Wraps Keycloak 26+ to validate JWTs, resolve university/club context from token claims, and sync org membership events into a local mirror.
+Python authentication library for the A Million Techies ecosystem. Wraps Keycloak 26+ to validate JWTs, resolve organization and group context from token claims, and sync org membership events into a local mirror.
 
 Every Django backend in the platform imports this library — the core has zero Django dependencies.
 
@@ -29,7 +29,7 @@ print(claims.sub)               # Keycloak user ID
 print(claims.email)             # alice@example.com
 print(claims.realm_roles)       # frozenset of realm-level roles
 print(claims.client_roles)      # frozenset of roles for AMT_CLIENT_ID
-print(claims.active_university) # UniversityMembership | None
+print(claims.active_organization) # OrgMembership | None
 ```
 
 ## Configuration
@@ -59,27 +59,27 @@ class TokenClaims:
     family_name: str | None
     realm_roles: frozenset[str]
     client_roles: frozenset[str]          # roles scoped to AMT_CLIENT_ID
-    memberships: tuple[UniversityMembership, ...]
-    active_university: UniversityMembership | None   # first in insertion order
+    memberships: tuple[OrgMembership, ...]
+    active_organization: OrgMembership | None  # first in insertion order
     raw: dict                             # original decoded payload
 ```
 
 ```python
 @dataclass(frozen=True)
-class UniversityMembership:
+class OrgMembership:
     id: str
     name: str
     roles: list[str]
-    clubs: list[ClubRef]
+    groups: list[GroupRef]
 
 @dataclass(frozen=True)
-class ClubRef:
+class GroupRef:
     id: str
     name: str
-    university_id: str
+    organization_id: str
 ```
 
-University and club data come from the `organization` JWT claim that Keycloak injects when the Organizations feature is enabled.
+Organization data comes from the `organization` JWT claim that Keycloak injects when the Organizations feature is enabled.
 
 ## Admin API
 
@@ -106,12 +106,12 @@ Non-2xx responses raise `AdminAPIError(status_code, body)`.
 from amt_auth import MirrorRepository, consume_event
 
 class MyDjangoRepo:
-    def upsert_university(self, id, name, synced_at): ...
-    def soft_delete_university(self, id, synced_at): ...
-    def upsert_club(self, id, name, university_id, synced_at): ...
-    def soft_delete_club(self, id, synced_at): ...
-    def upsert_membership(self, user_sub, university_id, club_id, roles, synced_at): ...
-    def soft_delete_membership(self, user_sub, university_id, club_id, synced_at): ...
+    def upsert_organization(self, id, name, synced_at): ...
+    def soft_delete_organization(self, id, synced_at): ...
+    def upsert_group(self, id, name, organization_id, synced_at): ...
+    def soft_delete_group(self, id, synced_at): ...
+    def upsert_membership(self, user_sub, organization_id, group_id, roles, synced_at): ...
+    def soft_delete_membership(self, user_sub, organization_id, group_id, synced_at): ...
     def soft_delete_memberships_by_sub(self, user_sub, synced_at): ...
 
 consume_event(event_dict, MyDjangoRepo())
@@ -120,6 +120,46 @@ consume_event(event_dict, MyDjangoRepo())
 Supported event types: `ORG_CREATED`, `ORG_UPDATED`, `ORG_DELETED`, `ORG_GROUP_CREATED`, `ORG_GROUP_UPDATED`, `ORG_GROUP_DELETED`, `ORG_MEMBERSHIP_ADDED`, `ORG_MEMBERSHIP_REMOVED`, `USER_DELETED`.
 
 Unknown event types are logged and silently skipped. Malformed payloads raise `SyncError`.
+
+## Django integration
+
+Install `amt-auth[django]`, then in `settings.py`:
+
+```python
+INSTALLED_APPS = [..., "rest_framework", "amt_auth.django"]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "amt_auth.django.authentication.KeycloakAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+}
+
+AMT_WEBHOOK_SECRET = os.environ["AMT_WEBHOOK_SECRET"]
+```
+
+Run `python manage.py migrate` to create the mirror tables (`Organization`, `Group`, `Membership`).
+
+In a view, `request.user` is a `KeycloakUser` (never stored in the database) and `request.auth` is the `TokenClaims`:
+
+```python
+from amt_auth.django.permissions import IsOrgMember, has_client_role, has_realm_role
+
+class ReportView(APIView):
+    permission_classes = [IsOrgMember, has_realm_role("admin")]
+
+    def get(self, request):
+        org = request.auth.active_organization
+        ...
+```
+
+To receive Keycloak org events, mount the webhook:
+
+```python
+urlpatterns = [path("auth/", include("amt_auth.django.urls"))]
+```
+
+`POST /auth/webhook/` requires the `X-AMT-Webhook-Secret` header to match `AMT_WEBHOOK_SECRET` and writes the event to the mirror tables through `DjangoMirrorRepository`.
 
 ## Exceptions
 
