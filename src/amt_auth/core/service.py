@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from amt_auth.core.admin import AdminClient
-from amt_auth.core.claims import TokenClaims, UniversityMembership
+from amt_auth.core.claims import TokenClaims, OrgMembership
 from amt_auth.core.config import AMTConfig
 from amt_auth.core.validator import TokenValidator
 
@@ -27,15 +27,15 @@ class AuthService:
         """Validate a raw JWT string and return parsed claims."""
         return self._validator.validate(raw_jwt)
 
-    def get_active_university(
+    def get_active_organization(
         self, claims: TokenClaims
-    ) -> UniversityMembership | None:
-        """Return the active university for a token.
+    ) -> OrgMembership | None:
+        """Return the active organization for a token.
 
         Phase A: returns the first membership in insertion order.
-        Phase E: will honour the keycloak-orgs active-university attribute.
+        Phase E: will honour the keycloak-orgs active-organization attribute.
         """
-        return claims.active_university
+        return claims.active_organization
 
     def onboard_user(self, *args, **kwargs) -> None:
         raise NotImplementedError(
