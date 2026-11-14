@@ -9,11 +9,16 @@ backend/    Django + DRF, mounts amt_auth.django
 
 ## Run it
 
-You need a Keycloak 26 realm (`kc.sh start-dev --features organization`) with a client for the frontend:
+You need Keycloak 26 running locally, with the realm configured by the setup script:
 
-- public client, standard flow, PKCE
-- valid redirect URI and web origin: `http://localhost:5173`
-- an **audience mapper** that adds `AMT_CLIENT_ID` to the access token's `aud`, otherwise the backend rejects the token
+```bash
+KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  $KEYCLOAK_HOME/bin/kc.sh start-dev
+
+KEYCLOAK_HOME=/path/to/keycloak scripts/keycloak-dev-setup.sh
+```
+
+The script creates the `amilliontechies` realm, the `amt-backend` and `amt-frontend` clients, and a sample user `alice` / `alice` who administers the JKUAT organization. The values in both `.env.example` files match it.
 
 Backend, from the repo root:
 

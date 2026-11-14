@@ -46,9 +46,16 @@ function Profile({ token }: { token: string }) {
       {me.organizations.length === 0 && <p>You are not a member of any organization yet.</p>}
       {me.organizations.map((org) => (
         <section key={org.id}>
-          <h3>{org.name}</h3>
-          <p>Roles: {org.roles.join(', ') || 'none'}</p>
-          {org.roles.includes('admin') && <InviteForm token={token} org={org} />}
+          <h3>{org.alias}</h3>
+          <ul>
+            {org.groups.map((group) => (
+              <li key={`${group.kind}/${group.name}`}>
+                {group.name}
+                {group.kind && ` (${group.kind})`}
+              </li>
+            ))}
+          </ul>
+          {org.is_admin && <InviteForm token={token} org={org} />}
         </section>
       ))}
 
