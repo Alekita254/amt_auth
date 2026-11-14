@@ -37,3 +37,7 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Example app
+db.sqlite3
+node_modules/
