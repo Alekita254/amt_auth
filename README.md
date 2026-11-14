@@ -218,12 +218,29 @@ act push --matrix python-version:3.12 --pull=false
 
 ## CI
 
-GitHub Actions runs tests against **Python 3.11 and 3.12** on every push and pull request to `main` and `develop`.
+GitHub Actions runs tests against **Python 3.11 and 3.12** on every push and pull request to `main`, `develop` and `release/*`.
+
+Two rules are enforced on pull requests:
+
+- **Branch policy**: `main` only accepts `release/*`; `develop` only accepts `feature/*` (and `release/*` merged back).
+- **Cleanup**: a `feature/*` branch is deleted automatically once its pull request is merged.
 
 ## Branch strategy
 
 | Branch | Purpose |
 |---|---|
-| `main` | Production — only merged from `develop` via PR |
-| `develop` | Integration — feature branches merge here |
-| `feature/*` | Short-lived; deleted after PR merge |
+| `feature/*` | Short-lived work; PR into `develop`, deleted on merge |
+| `develop` | Integration — only merged into via PR |
+| `release/x.y.z` | Cut from `develop`; bump the version here, then PR into `main` |
+| `main` | Production — only merged from `release/*` via PR |
+
+### Releasing
+
+```bash
+git checkout develop && git pull
+git checkout -b release/0.2.0
+# bump `version` in pyproject.toml, commit
+git push -u origin release/0.2.0
+# open a PR release/0.2.0 -> main, merge, then tag main as v0.2.0
+# open a PR release/0.2.0 -> develop to bring the version bump back
+```
