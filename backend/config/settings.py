@@ -1,4 +1,4 @@
-"""Minimal example backend showing how a product mounts amt-auth.
+"""Minimal Django backend for the frontend, showing how a product mounts amt-auth.
 
 Needs AMT_KEYCLOAK_URL, AMT_REALM, AMT_CLIENT_ID, AMT_CLIENT_SECRET and
 AMT_WEBHOOK_SECRET in the environment (see .env.example).
@@ -9,7 +9,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "example-only-not-for-production")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-not-for-production")
 DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 

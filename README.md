@@ -216,13 +216,13 @@ act push
 act push --matrix python-version:3.12 --pull=false
 ```
 
-## Example app
+## Frontend
 
-`examples/` holds a reference product: a Vite + React frontend that signs in with Keycloak and a small Django backend that mounts `amt_auth.django`. See [examples/README.md](examples/README.md).
+`frontend/` is the Vite + React app that signs in with Keycloak, and `backend/` is the small Django project it talks to, which mounts `amt_auth.django`. See [frontend/README.md](frontend/README.md).
 
 ## CI
 
-GitHub Actions runs tests against **Python 3.11 and 3.12** on every push and pull request to `main`, `develop` and `release/*`. The example frontend is linted and built in the same run.
+GitHub Actions runs tests against **Python 3.11 and 3.12** on every push and pull request to `main`, `develop` and `release/*`. The frontend is linted and built in the same run.
 
 Two rules are enforced on pull requests:
 

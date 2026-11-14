@@ -1,11 +1,10 @@
-# Example app
+# Frontend
 
-A reference product showing amt-auth end to end: a Vite + React frontend that signs in with Keycloak, and a small Django backend that validates the token with `amt_auth.django`.
+The Vite + React frontend for amt-auth. It signs in with Keycloak and talks to the small Django backend in `backend/`, which validates the token with `amt_auth.django`.
 
 ```
-examples/
-  backend/    Django + DRF, mounts amt_auth.django
-  frontend/   Vite + React + react-oidc-context
+frontend/   Vite + React + react-oidc-context
+backend/    Django + DRF, mounts amt_auth.django
 ```
 
 ## Run it
@@ -20,7 +19,7 @@ Backend, from the repo root:
 
 ```bash
 pip install -e ".[dev]"
-cd examples/backend
+cd backend
 cp .env.example .env        # fill in the values
 set -a && source .env && set +a
 python manage.py migrate
@@ -30,7 +29,7 @@ python manage.py runserver
 Frontend:
 
 ```bash
-cd examples/frontend
+cd frontend
 cp .env.example .env.local
 npm install
 npm run dev                 # http://localhost:5173, proxies /api to :8000

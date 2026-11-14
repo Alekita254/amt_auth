@@ -5,7 +5,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // The example Django backend; proxying avoids any CORS setup.
+    // The Django backend; proxying avoids any CORS setup.
     proxy: { '/api': 'http://localhost:8000' },
   },
 })

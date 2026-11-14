@@ -57,11 +57,11 @@ jobs:
         run: pytest -v --cov=src/amt_auth --cov-report=term-missing
 
   frontend:
-    name: Example frontend build
+    name: Frontend build
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: examples/frontend
+        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4

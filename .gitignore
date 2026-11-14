@@ -38,6 +38,6 @@ coverage.xml
 .DS_Store
 Thumbs.db
 
-# Example app
+# Frontend and backend
 db.sqlite3
 node_modules/
