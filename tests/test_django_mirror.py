@@ -17,7 +17,8 @@ T2 = datetime(2026, 1, 2, tzinfo=timezone.utc)
 def repo():
     repo = DjangoMirrorRepository()
     repo.upsert_organization("org-1", "JKUAT", T1)
-    repo.upsert_group("grp-1", "Robotics Club", "org-1", T1)
+    repo.upsert_group("grp-clubs", "clubs", "org-1", None, T1)
+    repo.upsert_group("grp-1", "Robotics Club", "org-1", "grp-clubs", T1)
     repo.upsert_membership("user-1", "org-1", None, ["member"], T1)
     repo.upsert_membership("user-1", "org-1", "grp-1", ["lead"], T1)
     return repo
@@ -35,16 +36,29 @@ def test_upsert_is_idempotent_and_updates(repo):
     assert Membership.objects.get(group=None).roles == ["admin"]
 
 
+def test_group_kind_comes_from_parent(repo):
+    assert Group.objects.get(id="grp-1").kind == "clubs"
+    assert Group.objects.get(id="grp-clubs").kind is None
+
+
+def test_soft_delete_parent_group_takes_children(repo):
+    repo.soft_delete_group("grp-clubs", T2)
+    assert not Group.objects.filter(deleted_at=None).exists()
+    assert Membership.objects.get(group_id="grp-1").deleted_at == T2
+    assert Membership.objects.get(group=None).deleted_at is None
+
+
 def test_soft_delete_org_cascades(repo):
     repo.soft_delete_organization("org-1", T2)
     assert Organization.objects.get().deleted_at == T2
-    assert Group.objects.get().deleted_at == T2
+    assert not Group.objects.filter(deleted_at=None).exists()
     assert not Membership.objects.filter(deleted_at=None).exists()
 
 
 def test_soft_delete_group_removes_its_memberships_only(repo):
     repo.soft_delete_group("grp-1", T2)
-    assert Group.objects.get().deleted_at == T2
+    assert Group.objects.get(id="grp-1").deleted_at == T2
+    assert Group.objects.get(id="grp-clubs").deleted_at is None
     assert Membership.objects.get(group=None).deleted_at is None
     assert Membership.objects.get(group_id="grp-1").deleted_at == T2
 
@@ -86,6 +100,20 @@ def test_webhook_rejects_bad_secret(secret):
 def test_webhook_rejects_when_secret_unset(settings):
     settings.AMT_WEBHOOK_SECRET = ""
     assert _post(ORG_EVENT, "").status_code == 403
+
+
+def test_webhook_group_event_records_parent(repo):
+    event = {
+        "type": "ORG_GROUP_CREATED",
+        "representation": {
+            "id": "grp-2",
+            "name": "Chess Club",
+            "organizationId": "org-1",
+            "parentId": "grp-clubs",
+        },
+    }
+    assert _post(event).status_code == 204
+    assert Group.objects.get(id="grp-2").kind == "clubs"
 
 
 def test_webhook_malformed_event_is_400():

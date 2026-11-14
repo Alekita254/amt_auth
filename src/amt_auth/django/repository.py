@@ -22,13 +22,19 @@ class DjangoMirrorRepository:
         Membership.objects.filter(organization_id=id).update(**stamp)
 
     def upsert_group(
-        self, id: str, name: str, organization_id: str, synced_at: datetime
+        self,
+        id: str,
+        name: str,
+        organization_id: str,
+        parent_id: str | None,
+        synced_at: datetime,
     ) -> None:
         Group.objects.update_or_create(
             id=id,
             defaults={
                 "name": name,
                 "organization_id": organization_id,
+                "parent_id": parent_id,
                 "synced_at": synced_at,
                 "deleted_at": None,
             },
@@ -38,6 +44,8 @@ class DjangoMirrorRepository:
         stamp = {"deleted_at": synced_at, "synced_at": synced_at}
         Group.objects.filter(id=id).update(**stamp)
         Membership.objects.filter(group_id=id).update(**stamp)
+        for child_id in Group.objects.filter(parent_id=id).values_list("id", flat=True):
+            self.soft_delete_group(child_id, synced_at)
 
     def upsert_membership(
         self,

@@ -108,7 +108,7 @@ from amt_auth import MirrorRepository, consume_event
 class MyDjangoRepo:
     def upsert_organization(self, id, name, synced_at): ...
     def soft_delete_organization(self, id, synced_at): ...
-    def upsert_group(self, id, name, organization_id, synced_at): ...
+    def upsert_group(self, id, name, organization_id, parent_id, synced_at): ...
     def soft_delete_group(self, id, synced_at): ...
     def upsert_membership(self, user_sub, organization_id, group_id, roles, synced_at): ...
     def soft_delete_membership(self, user_sub, organization_id, group_id, synced_at): ...
@@ -160,6 +160,25 @@ urlpatterns = [path("auth/", include("amt_auth.django.urls"))]
 ```
 
 `POST /auth/webhook/` requires the `X-AMT-Webhook-Secret` header to match `AMT_WEBHOOK_SECRET` and writes the event to the mirror tables through `DjangoMirrorRepository`.
+
+### Group kinds
+
+Clubs and mentorships are both groups inside an organization. Each organization has top-level groups (`clubs`, `mentorships`) and the real ones sit underneath, so a group's kind is its parent's name:
+
+```python
+Group.objects.get(id="...").kind   # "clubs", "mentorships", or None for a top-level group
+```
+
+### Onboarding
+
+Admins set up organizations and bring users in through two endpoints. Both call Keycloak; the mirror tables catch up through the webhook.
+
+| Endpoint | Who | Body |
+|---|---|---|
+| `POST /auth/organizations/` | realm role `admin` | `{"name": "...", "domains": ["..."]}` (domains optional) |
+| `POST /auth/organizations/<id>/invitations/` | that organization's `admin`, or realm `admin` | `{"email": "...", "first_name": "...", "last_name": "..."}` (names optional) |
+
+An invitation makes Keycloak email the user a link to register and join the organization.
 
 ## Exceptions
 

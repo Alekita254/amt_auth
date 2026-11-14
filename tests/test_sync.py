@@ -62,6 +62,19 @@ def test_group_created():
     kw = repo.upsert_group.call_args.kwargs
     assert kw["id"] == "g-1"
     assert kw["organization_id"] == "org-1"
+    assert kw["parent_id"] is None
+
+
+def test_group_created_with_parent():
+    repo = _repo()
+    consume_event(
+        _event(
+            "ORG_GROUP_CREATED",
+            {"id": "g-1", "name": "Robotics", "organizationId": "org-1", "parentId": "g-clubs"},
+        ),
+        repo,
+    )
+    assert repo.upsert_group.call_args.kwargs["parent_id"] == "g-clubs"
 
 
 def test_group_updated():
