@@ -14,7 +14,12 @@ def me(request):
             "name": claims.name,
             "realm_roles": sorted(claims.realm_roles),
             "organizations": [
-                {"id": m.id, "name": m.name, "roles": list(m.roles)}
+                {
+                    "id": m.id,
+                    "alias": m.alias,
+                    "is_admin": m.is_admin,
+                    "groups": [{"name": g.name, "kind": g.kind} for g in m.groups],
+                }
                 for m in claims.memberships
             ],
         }

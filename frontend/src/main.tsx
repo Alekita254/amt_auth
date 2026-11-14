@@ -11,6 +11,8 @@ createRoot(document.getElementById('root')!).render(
     <AuthProvider
       authority={`${VITE_KEYCLOAK_URL}/realms/${VITE_REALM}`}
       client_id={VITE_CLIENT_ID}
+      // `organization` puts the user's organizations and groups in the token.
+      scope="openid profile email organization"
       redirect_uri={window.location.origin}
       post_logout_redirect_uri={window.location.origin}
       // Drop the ?code=...&state=... Keycloak leaves in the URL after login.

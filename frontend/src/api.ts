@@ -1,4 +1,6 @@
-export type Organization = { id: string; name: string; roles: string[] }
+export type Group = { name: string; kind: string | null }
+
+export type Organization = { id: string; alias: string; is_admin: boolean; groups: Group[] }
 
 export type Me = {
   sub: string
