@@ -270,3 +270,7 @@ git push -u origin release/0.2.0
 ```
 
 Pushing the tag publishes that version to [PyPI](https://pypi.org/project/amt-auth/) through `.github/workflows/publish.yml`. The tag must match the version in `pyproject.toml`, and a version can only be published once.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

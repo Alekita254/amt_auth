@@ -7,6 +7,8 @@ name = "amt-auth"
 version = "0.2.0"
 description = "Keycloak authentication for the A Million Techies ecosystem: JWT validation, organization context and Django integration."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "A Million Techies" }]
 keywords = ["keycloak", "authentication", "jwt", "django", "oidc"]
 classifiers = [
@@ -41,7 +43,7 @@ dev = [
 Repository = "https://github.com/MillionTechies/amt_auth"
 
 [tool.hatch.build.targets.sdist]
-include = ["/src/amt_auth", "/tests", "/README.md"]
+include = ["/src/amt_auth", "/tests", "/README.md", "/LICENSE"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amt_auth"]
