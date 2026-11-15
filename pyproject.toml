@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amt-auth"
-version = "0.2.0"
+version = "0.2.1"
 description = "Keycloak authentication for the A Million Techies ecosystem: JWT validation, organization context and Django integration."
 readme = "README.md"
 license = "MIT"
