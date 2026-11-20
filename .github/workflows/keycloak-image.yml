@@ -1,0 +1,55 @@
+name: Keycloak image
+
+# Builds deploy/keycloak into ghcr.io/milliontechies/amt-keycloak.
+# Pull requests that touch it only build; a `keycloak-v<keycloak version>-<n>` tag
+# (e.g. keycloak-v26.8.2-1) publishes `:26.8.2-1` and `:latest`.
+
+on:
+  pull_request:
+    paths: ["deploy/keycloak/**", ".github/workflows/keycloak-image.yml"]
+  push:
+    tags: ["keycloak-v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/milliontechies/amt-keycloak
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the image tag
+        id: tag
+        run: |
+          version="$(sed -n 's/^ARG KEYCLOAK_VERSION=//p' deploy/keycloak/Dockerfile)"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            tag="${GITHUB_REF_NAME#keycloak-v}"
+            if [[ ! "$tag" =~ ^${version//./\\.}-[0-9]+$ ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME must be keycloak-v$version-<n> to match the Dockerfile's Keycloak $version."
+              exit 1
+            fi
+            echo "tags=$IMAGE:$tag,$IMAGE:latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=$IMAGE:pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/keycloak
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.tag.outputs.tags }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}

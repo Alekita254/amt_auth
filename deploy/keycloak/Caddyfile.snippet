@@ -1,0 +1,17 @@
+# Add to the server's Caddyfile, then `caddy reload` (or reload the Caddy container).
+# Cloudflare DNS for auth.amilliontechies.com is DNS-only, so Caddy obtains the
+# certificate itself.
+#
+# The admin console and the master realm are not served publicly; reach them
+# through an SSH tunnel instead:  ssh -L 8080:127.0.0.1:8080 <server>
+# The amilliontechies realm's Admin REST API (/admin/realms/amilliontechies/...)
+# stays reachable: product backends on other hosts call it with their service
+# account's token, and it rejects anything without one.
+auth.amilliontechies.com {
+	@blocked path /admin /admin/ /admin/master/* /admin/amilliontechies/console* /admin/realms/master/* /realms/master/*
+	respond @blocked 404
+
+	# If Caddy itself runs in Docker, use the Keycloak container's address on a
+	# shared network (e.g. keycloak:8080) instead of 127.0.0.1.
+	reverse_proxy 127.0.0.1:8080
+}
