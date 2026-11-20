@@ -5,7 +5,7 @@
 # Inside the Keycloak container:
 #   docker compose exec -T \
 #     -e PRODUCTS="community=https://community.amilliontechies.com" \
-#     keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
+#     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
 #
 # PRODUCTS is a space-separated list of name=URL. Each product gets:
 #   <name>-frontend  public client (PKCE), sign-in only from URL

@@ -37,17 +37,19 @@ browser ──► community.amilliontechies.com ──(sign in)──► auth.am
    ```bash
    cd /opt/amt-keycloak
    cp .env.example .env && chmod 600 .env
-   # fill in DB_PASSWORD and KC_BOOTSTRAP_ADMIN_PASSWORD (openssl rand -base64 32)
+   # fill in DB_PASSWORD and KC_BOOTSTRAP_ADMIN_PASSWORD (openssl rand -base64 32),
+   # and PROXY_NETWORK: the Docker network the Caddy container is on
    docker compose up -d
-   docker compose ps          # keycloak becomes "healthy" after about a minute
+   docker compose ps          # amt-keycloak becomes "healthy" after about a minute
    ```
-3. **Caddy**: add `Caddyfile.snippet` to the Caddyfile and reload Caddy. If Caddy runs
-   in Docker, put it on a network shared with the `keycloak` container and proxy to
-   `keycloak:8080`.
+3. **Caddy**: add `Caddyfile.snippet` to the Caddyfile, then reload Caddy. Caddy runs in
+   Docker and reaches Keycloak as `amt-keycloak:8080` over `PROXY_NETWORK`. The services
+   are prefixed `amt-` because that network is shared: a bare `keycloak` would clash
+   with another project's Keycloak in Docker's DNS.
 4. **Realm and clients**: one pair of clients per product:
    ```bash
    docker compose exec -T -e PRODUCTS="community=https://community.amilliontechies.com" \
-     keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
+     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
    ```
    It prints `AMT_CLIENT_ID` and `AMT_CLIENT_SECRET` for each new backend. Put them in
    that product's backend env, together with `AMT_KEYCLOAK_URL=https://auth.amilliontechies.com`
@@ -58,13 +60,13 @@ browser ──► community.amilliontechies.com ──(sign in)──► auth.am
    docker compose exec -T -e SMTP_HOST=smtp.zoho.com -e SMTP_PORT=587 \
      -e SMTP_USER=info@amilliontechies.com -e SMTP_PASSWORD='...' \
      -e SMTP_FROM=info@amilliontechies.com \
-     keycloak bash /opt/keycloak/amt-scripts/keycloak-email.sh
+     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-email.sh
    ```
 6. **Google sign-in**: in the Google OAuth client, add the redirect URI
    `https://auth.amilliontechies.com/realms/amilliontechies/broker/google/endpoint`, then:
    ```bash
    docker compose exec -T -e GOOGLE_CLIENT_ID=... -e GOOGLE_CLIENT_SECRET=... \
-     keycloak bash /opt/keycloak/amt-scripts/keycloak-google.sh
+     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-google.sh
    ```
 7. **Your admin account**, through the tunnel (see below):
    - In the **master** realm, create your own user, set a password, and give it the
@@ -111,7 +113,7 @@ and new ones are created and their secrets printed:
 ```bash
 docker compose exec -T \
   -e PRODUCTS="community=https://community.amilliontechies.com learn=https://learn.amilliontechies.com" \
-  keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
+  amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
 ```
 
 ## Upgrade Keycloak or the theme
@@ -124,7 +126,7 @@ docker compose exec -T \
    ```bash
    ./backup.sh                                    # a fresh backup first
    sed -i 's/^KEYCLOAK_IMAGE=.*/KEYCLOAK_IMAGE=ghcr.io\/milliontechies\/amt-keycloak:26.8.2-2/' .env
-   docker compose pull keycloak && docker compose up -d
+   docker compose pull amt-keycloak && docker compose up -d
    ```
 3. Run the checks above and sign in to a product. To roll back, put the old tag back
    in `.env`. After a Keycloak *version* change, also restore the backup taken in step 2,
@@ -133,10 +135,10 @@ docker compose exec -T \
 ## Restore a backup
 
 ```bash
-docker compose stop keycloak
-docker compose exec -T db pg_restore -U keycloak -d keycloak --clean --if-exists --no-owner \
+docker compose stop amt-keycloak
+docker compose exec -T amt-keycloak-db pg_restore -U keycloak -d keycloak --clean --if-exists --no-owner \
   < backups/keycloak-<timestamp>.dump      # or fetch one first: rclone copy $BACKUP_REMOTE/<file> backups/
-docker compose start keycloak
+docker compose start amt-keycloak
 ```
 
 To test a backup without touching production, run the same steps in a scratch copy:
