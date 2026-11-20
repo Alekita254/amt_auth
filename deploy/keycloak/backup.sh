@@ -14,7 +14,7 @@ KEEP_DAYS=14
 mkdir -p backups
 file="backups/keycloak-$(date -u +%Y%m%dT%H%M%SZ).dump"
 
-docker compose exec -T db pg_dump -U keycloak -d keycloak --format=custom > "$file.partial"
+docker compose exec -T amt-keycloak-db pg_dump -U keycloak -d keycloak --format=custom > "$file.partial"
 mv "$file.partial" "$file"
 echo "$(date -u +%FT%TZ) wrote $file ($(du -h "$file" | cut -f1))"
 

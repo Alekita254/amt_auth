@@ -11,7 +11,9 @@ auth.amilliontechies.com {
 	@blocked path /admin /admin/ /admin/master/* /admin/amilliontechies/console* /admin/realms/master/* /realms/master/*
 	respond @blocked 404
 
-	# If Caddy itself runs in Docker, use the Keycloak container's address on a
-	# shared network (e.g. keycloak:8080) instead of 127.0.0.1.
-	reverse_proxy 127.0.0.1:8080
+	# Caddy runs in Docker on PROXY_NETWORK, where Keycloak is `amt-keycloak`.
+	# (A Caddy installed on the host would use 127.0.0.1:8080 instead.)
+	reverse_proxy amt-keycloak:8080
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 }
