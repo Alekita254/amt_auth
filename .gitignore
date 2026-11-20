@@ -44,3 +44,6 @@ node_modules/
 
 # Local Keycloak + Java for development
 .keycloak/
+
+# Keycloak backups made by deploy/keycloak/backup.sh
+deploy/keycloak/backups/

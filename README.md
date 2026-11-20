@@ -236,6 +236,10 @@ act push
 act push --matrix python-version:3.12 --pull=false
 ```
 
+## Production identity server
+
+The library is not hosted anywhere. Keycloak is, at `https://auth.amilliontechies.com`, and every product's backend points `AMT_KEYCLOAK_URL` at it. `deploy/keycloak/` holds the server's setup: a Keycloak image with the `amt` login theme, the Docker Compose file, the Caddy block, the realm scripts and backups. [deploy/keycloak/README.md](deploy/keycloak/README.md) is the runbook.
+
 ## Frontend
 
 `frontend/` is the Vite + React app that signs in with Keycloak, and `backend/` is the small Django project it talks to, which mounts `amt_auth.django`. See [frontend/README.md](frontend/README.md).
