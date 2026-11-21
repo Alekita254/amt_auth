@@ -169,20 +169,19 @@
   "points": ["Join workshops, meetups and hackathons", "Learn at your own pace", "Manage your profile, password and passkeys in one place"],
   "pass": "Member pass"
 }>
+<#assign community = {
+  "name": "Community", "eyebrow": "A Million Techies Community",
+  "title": "Learn. Build. Grow.", "titleEm": "Together.",
+  "lede": "One A Million Techies account for workshops, meetups and hackathons, where learners and mentors build together.",
+  "joinTitle": "One account for every event you go to.",
+  "points": ["Register for workshops, meetups and hackathons", "Check in with the QR code on your ticket", "Keep certificates anyone can verify"],
+  "pass": "Community pass"
+}>
 <#assign brands = {
-  "community": {
-    "name": "Community", "eyebrow": "A Million Techies Community",
-    "title": "Learn. Build. Grow.", "titleEm": "Together.",
-    "lede": "One A Million Techies account for workshops, meetups and hackathons, where learners and mentors build together.",
-    "joinTitle": "One account for every event you go to.",
-    "points": ["Register for workshops, meetups and hackathons", "Check in with the QR code on your ticket", "Keep certificates anyone can verify"],
-    "pass": "Community pass"
-  },
-  "admin": {
-    "name": "Admin", "eyebrow": "A Million Techies Admin",
-    "title": "Run the platform.", "titleEm": "Carefully.",
-    "lede": "Manage members, organisations and apps for every A Million Techies product.",
-    "joinTitle": "", "points": [], "pass": "Staff pass"
+  "community": community,
+  <#-- The admin console: the Community page, titled for the identity server itself. -->
+  "admin": community + {
+    "name": "Authentication", "eyebrow": "A Million Techies Authentication", "pass": "Authentication pass"
   }
 }>
 <#assign brand = brands[product]!(platform + {"name": product?cap_first})>
