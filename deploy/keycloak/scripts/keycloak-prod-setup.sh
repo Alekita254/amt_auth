@@ -134,5 +134,8 @@ done
 
 CLIENT_ID='' VERIFY_EMAIL=true bash "$SCRIPTS/keycloak-realm-settings.sh"
 
+# The admin console's sign-in (master realm) uses the same theme.
+kc update realms/master -s loginTheme=amt
+
 echo
 echo "Realm '$REALM' is ready at its issuer: \$KC_HOSTNAME/realms/$REALM"

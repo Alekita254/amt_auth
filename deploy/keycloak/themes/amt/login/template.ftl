@@ -158,6 +158,7 @@
 <#if client??>
   <#if client.clientId == "amt-frontend"><#assign product = "community">
   <#elseif client.clientId?ends_with("-frontend")><#assign product = client.clientId?remove_ending("-frontend")>
+  <#elseif client.clientId == "security-admin-console"><#assign product = "admin">
   </#if>
 </#if>
 <#assign platform = {
@@ -176,11 +177,18 @@
     "joinTitle": "One account for every event you go to.",
     "points": ["Register for workshops, meetups and hackathons", "Check in with the QR code on your ticket", "Keep certificates anyone can verify"],
     "pass": "Community pass"
+  },
+  "admin": {
+    "name": "Admin", "eyebrow": "A Million Techies Admin",
+    "title": "Run the platform.", "titleEm": "Carefully.",
+    "lede": "Manage members, organisations and apps for every A Million Techies product.",
+    "joinTitle": "", "points": [], "pass": "Staff pass"
   }
 }>
 <#assign brand = brands[product]!(platform + {"name": product?cap_first})>
-<#-- Only an app's own client links back to it; the account page is where you already are. -->
-<#if !product?has_content><#assign homeUrl = ""></#if>
+<#-- Only an app's own client links back to it: the account page and the admin console
+     are where the person already is. -->
+<#if !product?has_content || product == "admin"><#assign homeUrl = ""></#if>
 <#assign appName = brand.name?has_content?then(brand.name, "A Million Techies")>
 <div class="amt-shell">
   <aside class="amt-brand" aria-hidden="true">
