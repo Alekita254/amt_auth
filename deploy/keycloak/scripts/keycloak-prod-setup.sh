@@ -30,9 +30,8 @@ csv() { kc get "$@" --format csv --noquotes; }
 client_id_of() { csv clients -r "$REALM" -q clientId="$1" --fields id,clientId | grep ",$1\$" | cut -d, -f1 || true; }
 has_mapper() { csv "$1/protocol-mappers/models" -r "$REALM" --fields name | grep -qx "$2"; }
 
-kc config credentials --server "$KEYCLOAK_URL" --realm master \
-  --user "${KC_ADMIN_USER:-${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}}" \
-  --password "${KC_ADMIN_PASSWORD:-${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}}"
+# shellcheck source=kc-login.sh
+. "$(dirname "$0")/kc-login.sh"
 
 # --- Realm -----------------------------------------------------------------------
 
@@ -134,12 +133,50 @@ done
 
 CLIENT_ID='' VERIFY_EMAIL=true bash "$SCRIPTS/keycloak-realm-settings.sh"
 
-# The admin console's sign-in (master realm) uses the same theme. The master realm
-# is only served through the SSH tunnel (Caddy answers 404 for it publicly), so its
-# URLs must point at the tunnel too; otherwise the console's login check loads from
-# the public host and fails with "Timeout when waiting for 3rd party check iframe".
-kc update realms/master -s loginTheme=amt \
-  -s "attributes.frontendUrl=${KC_HOSTNAME_ADMIN:-http://localhost:8080}"
+# --- Admin realm (master) ---------------------------------------------------------
+#
+# The admin console is served on its own hostname (KC_HOSTNAME_ADMIN). Its sign-in
+# uses the same theme, and the realm's URLs point at that hostname; otherwise the
+# console's login check goes to the public host, where /realms/master is blocked,
+# and stops with "Timeout when waiting for 3rd party check iframe message".
+ADMIN_URL="${KC_HOSTNAME_ADMIN:-http://localhost:8080}"
+kc update realms/master -s loginTheme=amt -s "attributes.frontendUrl=$ADMIN_URL" \
+  -s bruteForceProtected=true -s permanentLockout=false -s failureFactor=5 \
+  -s 'passwordPolicy=length(12) and notUsername and notEmail'
+# A new frontend URL changes the master realm's token issuer, so sign in again.
+. "$SCRIPTS/kc-login.sh"
+
+# Every admin signs in with a password and a code from an authenticator app. New
+# admins set the app up on their first sign-in; existing ones without it are asked
+# to on their next. The account this script signs in with is left alone, because
+# kcadm can't type a code: that is the bootstrap admin, which you delete.
+kc update authentication/required-actions/CONFIGURE_TOTP -r master -s enabled=true -s defaultAction=true
+self="${KC_ADMIN_USER:-${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}}"
+csv users -r master --fields id,username | while IFS=, read -r uid uname; do
+  case "$uname" in service-account-*) continue ;; esac
+  [ -z "${KC_ADMIN_CLIENT_SECRET:-}" ] && [ "$uname" = "$self" ] && continue
+  csv "users/$uid/credentials" -r master --fields type | grep -qx otp && continue
+  actions="$(kc get "users/$uid" -r master --fields requiredActions --format json | tr -d ' \n')"
+  case "$actions" in *CONFIGURE_TOTP*) continue ;; esac
+  actions="${actions#*[}"; actions="${actions%]*}"
+  kc update "users/$uid" -r master -s "requiredActions=[${actions:+$actions,}\"CONFIGURE_TOTP\"]"
+  echo "Admin '$uname' must set up an authenticator app on their next sign-in."
+done
+
+# amt-deploy: the service account deploy.sh and these scripts sign in with
+# (KC_ADMIN_CLIENT_SECRET). It has no password or browser sign-in, so no code either.
+deploy_id="$(csv clients -r master -q clientId=amt-deploy --fields id,clientId | grep ',amt-deploy$' | cut -d, -f1 || true)"
+if [ -z "$deploy_id" ]; then
+  kc create clients -r master -s clientId=amt-deploy -s publicClient=false \
+    -s serviceAccountsEnabled=true -s standardFlowEnabled=false \
+    -s directAccessGrantsEnabled=false -s implicitFlowEnabled=false >/dev/null
+  deploy_id="$(csv clients -r master -q clientId=amt-deploy --fields id,clientId | grep ',amt-deploy$' | cut -d, -f1)"
+  kc add-roles -r master --uusername service-account-amt-deploy --rolename admin
+  # Without the kc-admin-api scope the Admin API answers 401.
+  kc update "clients/$deploy_id/default-client-scopes/$(csv client-scopes -r master --fields id,name | grep ',kc-admin-api$' | cut -d, -f1)" -r master
+  echo "Created the amt-deploy service account. Put this in the server's .env:"
+  echo "  KC_ADMIN_CLIENT_SECRET=$(kc get "clients/$deploy_id/client-secret" -r master --fields value --format csv --noquotes)   (shown once)"
+fi
 
 echo
 echo "Realm '$REALM' is ready at its issuer: \$KC_HOSTNAME/realms/$REALM"

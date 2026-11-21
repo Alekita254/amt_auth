@@ -8,7 +8,8 @@
 # 3. builds the image from this checkout, tagged as KEYCLOAK_IMAGE in .env
 # 4. docker compose up -d, and waits until Keycloak is healthy
 # 5. reruns the realm setup (keycloak-prod-setup.sh) for PRODUCTS in .env,
-#    signing in as KC_ADMIN_USER / KC_ADMIN_PASSWORD (or the bootstrap admin)
+#    signing in with the amt-deploy service account (KC_ADMIN_CLIENT_SECRET), or
+#    the bootstrap admin on a fresh server
 # 6. checks the public URL
 #
 # Options: --no-pull, --no-backup, --no-setup.
@@ -76,21 +77,16 @@ echo "Keycloak is healthy."
 
 # --- 5. Realm setup ----------------------------------------------------------------
 PRODUCTS="$(env_value PRODUCTS)"
-ADMIN_USER="$(env_value KC_ADMIN_USER)"
-ADMIN_PASSWORD="$(env_value KC_ADMIN_PASSWORD)"
+CLIENT_SECRET="$(env_value KC_ADMIN_CLIENT_SECRET)"
 if [ "$SETUP" = 0 ]; then
   :
 elif [ -z "$PRODUCTS" ]; then
   echo "Skipping the realm setup: set PRODUCTS in .env to run it on every deploy."
-elif [ -z "$ADMIN_USER" ] && [ -z "$(env_value KC_BOOTSTRAP_ADMIN_USERNAME)" ]; then
-  echo "Skipping the realm setup: set KC_ADMIN_USER and KC_ADMIN_PASSWORD in .env to run it on every deploy."
+elif [ -z "$CLIENT_SECRET" ] && [ -z "$(env_value KC_BOOTSTRAP_ADMIN_USERNAME)" ]; then
+  echo "Skipping the realm setup: set KC_ADMIN_CLIENT_SECRET in .env (the amt-deploy secret)."
 else
   step "Updating the realm and clients"
-  extra=()
-  if [ -n "$ADMIN_USER" ]; then
-    extra=(-e "KC_ADMIN_USER=$ADMIN_USER" -e "KC_ADMIN_PASSWORD=$ADMIN_PASSWORD")
-  fi
-  docker compose exec -T -e "PRODUCTS=$PRODUCTS" "${extra[@]}" \
+  docker compose exec -T -e "PRODUCTS=$PRODUCTS" -e "KC_ADMIN_CLIENT_SECRET=$CLIENT_SECRET" \
     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
 fi
 
@@ -99,7 +95,7 @@ step "Checking $HOSTNAME_URL"
 issuer="$(curl -fsS "$HOSTNAME_URL/realms/amilliontechies/.well-known/openid-configuration" | grep -o '"issuer":"[^"]*"' || true)"
 admin_code="$(curl -s -o /dev/null -w '%{http_code}' "$HOSTNAME_URL/admin/")"
 echo "issuer:  ${issuer:-MISSING}"
-echo "/admin/: $admin_code (expected 404)"
+echo "/admin/: $admin_code (expected 404: the console is on KC_HOSTNAME_ADMIN)"
 if [ -z "$issuer" ] || [ "$admin_code" != 404 ]; then
   echo "Check failed." >&2
   exit 1

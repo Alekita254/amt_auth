@@ -26,13 +26,15 @@ browser ──► community.amilliontechies.com ──(sign in)──► auth.am
   registered for the product's frontend client.
 - The product's backend calls `https://auth.amilliontechies.com` for signing keys, its
   service-account token and the realm's Admin REST API.
-- The admin console and the `master` realm are **not served publicly**. Caddy answers
-  404, and you reach the console through an SSH tunnel.
+- The admin console and the `master` realm are served only on
+  `auth-admin.amilliontechies.com` (`KC_HOSTNAME_ADMIN`). On `auth.amilliontechies.com`
+  Caddy answers 404 for them. Every admin signs in with a password and a code from an
+  authenticator app.
 
 ## First deploy
 
-1. **DNS**: in Cloudflare, add an A record `auth` pointing at the server's IP, set to
-   DNS only (grey cloud).
+1. **DNS**: in Cloudflare, add A records `auth` and `auth-admin` pointing at the
+   server's IP, set to DNS only (grey cloud).
 2. **Files**: copy `docker-compose.yml`, `.env.example` and `backup.sh` to the server,
    for example to `/opt/amt-keycloak/`. Then:
    ```bash
@@ -69,13 +71,16 @@ browser ──► community.amilliontechies.com ──(sign in)──► auth.am
    docker compose exec -T -e GOOGLE_CLIENT_ID=... -e GOOGLE_CLIENT_SECRET=... \
      amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-google.sh
    ```
-7. **Your admin account**, through the tunnel (see below):
+7. **Your admin account**, at https://auth-admin.amilliontechies.com:
+   - Step 4 printed `KC_ADMIN_CLIENT_SECRET` for the `amt-deploy` service account. Put it
+     in `.env`; `deploy.sh` and the setup scripts sign in with it from now on.
    - In the **master** realm, create your own user, set a password, and give it the
-     `admin` role. Sign in as that user, then delete `bootstrap-admin`.
+     `admin` role. Sign in as that user (you'll set up an authenticator app), then
+     delete `bootstrap-admin`.
    - In **amilliontechies**, give your member account the realm role `admin` (platform admin).
    - Remove `KC_BOOTSTRAP_ADMIN_USERNAME` and `KC_BOOTSTRAP_ADMIN_PASSWORD` from `.env`,
      then run `docker compose up -d`.
-   - The setup scripts now need `-e KC_ADMIN_USER=... -e KC_ADMIN_PASSWORD=...`.
+   - Running a script by hand now needs `-e KC_ADMIN_CLIENT_SECRET=...`.
 8. **Backups**:
    - Set up an rclone remote for Cloudflare R2 (`rclone config`) and set `BACKUP_REMOTE`
      in `.env`, for example `r2:amt-keycloak-backups`.
@@ -91,29 +96,33 @@ curl -s https://auth.amilliontechies.com/realms/amilliontechies/.well-known/open
 # "issuer":"https://auth.amilliontechies.com/realms/amilliontechies"
 curl -sI https://auth.amilliontechies.com/admin/ | head -1                 # 404
 curl -sI https://auth.amilliontechies.com/realms/master/ | head -1         # 404
+curl -sI https://auth-admin.amilliontechies.com/ | head -1                 # 302 to the console
+curl -sI https://auth-admin.amilliontechies.com/realms/amilliontechies/account/ | head -1  # 404
 curl -sI https://auth.amilliontechies.com/admin/realms/amilliontechies/organizations | head -1  # 401
 curl -m 5 http://<server-ip>:8080/  # fails
 curl -m 5 http://<server-ip>:9000/  # fails
 ```
 
-## Admin console (SSH tunnel)
+## Admin console
 
-```bash
-ssh -L 8080:127.0.0.1:8080 <server>
-```
+Open https://auth-admin.amilliontechies.com. There are two realms:
 
-Then open http://localhost:8080/admin. There are two realms:
-
-- **master**: admins only, for the admin console. No sign-up, not on the public URL.
+- **master**: admins only, for the admin console. No sign-up, and only on the admin
+  hostname. Admins need a password and an authenticator-app code; the setup script
+  asks every admin without an app to set one up on their next sign-in, and locks an
+  account for a while after 5 wrong passwords.
 - **amilliontechies**: every member, shared by all products. `https://auth.amilliontechies.com`
   opens its account page (profile, password, passkeys). Products send people to it
   through their own client (`community-frontend`, ...).
 
-The setup script sets the master realm's Frontend URL to `KC_HOSTNAME_ADMIN`, so the
-console's sign-in check stays on the tunnel. Without it the console stops with
-"Timeout when waiting for 3rd party check iframe message". The console's URLs point at
-`http://localhost:8080` (`KC_HOSTNAME_ADMIN`), so if port 8080 is already busy on your
-machine, stop whatever is using it first.
+The setup script points the master realm's Frontend URL at `KC_HOSTNAME_ADMIN`.
+Without it the console's sign-in check goes to the public host, where
+`/realms/master` is blocked, and stops with "Timeout when waiting for 3rd party check
+iframe message".
+
+To keep the console off the internet instead, set `KC_HOSTNAME_ADMIN=http://localhost:8080`,
+drop the `auth-admin` site from Caddy, rerun the setup, and use an SSH tunnel:
+`ssh -L 8080:127.0.0.1:8080 <server>`, then http://localhost:8080/admin.
 
 ## Deploy updates
 
@@ -126,10 +135,9 @@ After merging to the branch the server tracks, on the server:
 It pulls (fast-forward only), backs up the database, builds the image from the
 checkout under the `KEYCLOAK_IMAGE` tag, runs `docker compose up -d`, waits until
 Keycloak is healthy, reruns `keycloak-prod-setup.sh` for `PRODUCTS`, and checks the
-public URL. The realm setup needs `PRODUCTS`, `KC_ADMIN_USER` and `KC_ADMIN_PASSWORD`
-in `.env`; without them that step is skipped. Create a dedicated master-realm user for
-it (e.g. `deploy-admin`, realm role `admin`). Skip steps with `--no-pull`,
-`--no-backup` or `--no-setup`.
+public URL. The realm setup needs `PRODUCTS` and `KC_ADMIN_CLIENT_SECRET` (the
+`amt-deploy` service account) in `.env`; without them that step is skipped. Skip steps
+with `--no-pull`, `--no-backup` or `--no-setup`.
 
 ## Add a product
 
