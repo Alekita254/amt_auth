@@ -86,8 +86,20 @@ elif [ -z "$CLIENT_SECRET" ] && [ -z "$(env_value KC_BOOTSTRAP_ADMIN_USERNAME)" 
   echo "Skipping the realm setup: set KC_ADMIN_CLIENT_SECRET in .env (the amt-deploy secret)."
 else
   step "Updating the realm and clients"
-  docker compose exec -T -e "PRODUCTS=$PRODUCTS" -e "KC_ADMIN_CLIENT_SECRET=$CLIENT_SECRET" \
-    amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
+  # Keycloak reports healthy a little before its Admin API stops answering 503,
+  # so give the setup a few tries. It is safe to run again.
+  for attempt in 1 2 3 4 5; do
+    if docker compose exec -T -e "PRODUCTS=$PRODUCTS" -e "KC_ADMIN_CLIENT_SECRET=$CLIENT_SECRET" \
+      amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh; then
+      break
+    fi
+    if [ "$attempt" = 5 ]; then
+      echo "The realm setup failed 5 times. Logs: docker compose logs amt-keycloak --tail 100" >&2
+      exit 1
+    fi
+    echo "Retrying in 15 seconds..."
+    sleep 15
+  done
 fi
 
 # --- 6. Check ----------------------------------------------------------------------
