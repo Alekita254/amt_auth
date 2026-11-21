@@ -151,32 +151,68 @@
 <body id="keycloak-bg" class="amt ${properties.kcBodyClass!}" data-page-id="login-${pageId}">
 <#assign homeUrl = (client?? && client.baseUrl?has_content)?then(client.baseUrl, "")>
 <#assign joining = pageId?starts_with("register")>
+<#-- The app that sent the person here, from its client ID: community-frontend -> community.
+     amt-frontend is Community's client in local development. Anything else (the account
+     page, a new app) gets the platform's own wording. -->
+<#assign product = "">
+<#if client??>
+  <#if client.clientId == "amt-frontend"><#assign product = "community">
+  <#elseif client.clientId?ends_with("-frontend")><#assign product = client.clientId?remove_ending("-frontend")>
+  <#elseif client.clientId == "security-admin-console"><#assign product = "admin">
+  </#if>
+</#if>
+<#assign platform = {
+  "name": "", "eyebrow": "A Million Techies",
+  "title": "One account.", "titleEm": "Everything we build.",
+  "lede": "Sign in once for Community, Learn and every A Million Techies app: events, courses and the people you build with.",
+  "joinTitle": "One account for every A Million Techies app.",
+  "points": ["Join workshops, meetups and hackathons", "Learn at your own pace", "Manage your profile, password and passkeys in one place"],
+  "pass": "Member pass"
+}>
+<#assign community = {
+  "name": "Community", "eyebrow": "A Million Techies Community",
+  "title": "Learn. Build. Grow.", "titleEm": "Together.",
+  "lede": "One A Million Techies account for workshops, meetups and hackathons, where learners and mentors build together.",
+  "joinTitle": "One account for every event you go to.",
+  "points": ["Register for workshops, meetups and hackathons", "Check in with the QR code on your ticket", "Keep certificates anyone can verify"],
+  "pass": "Community pass"
+}>
+<#assign brands = {
+  "community": community,
+  <#-- The admin console: the Community page, titled for the identity server itself. -->
+  "admin": community + {
+    "name": "Authentication", "eyebrow": "A Million Techies Authentication", "pass": "Authentication pass"
+  }
+}>
+<#assign brand = brands[product]!(platform + {"name": product?cap_first})>
+<#-- Only an app's own client links back to it: the account page and the admin console
+     are where the person already is. -->
+<#if !product?has_content || product == "admin"><#assign homeUrl = ""></#if>
+<#assign appName = brand.name?has_content?then(brand.name, "A Million Techies")>
 <div class="amt-shell">
   <aside class="amt-brand" aria-hidden="true">
     <div class="amt-brand__grid"></div>
     <div class="amt-brand__glow"></div>
     <div class="amt-logo amt-logo--light">
       <span class="amt-logo__mark"><i></i></span>
-      <span>A Million Techies <b>Community</b></span>
+      <span>A Million Techies<#if brand.name?has_content> <b>${brand.name}</b></#if></span>
     </div>
     <div class="amt-brand__pitch">
       <#if joining>
         <p class="amt-eyebrow">Join A Million Techies, free</p>
-        <p class="amt-brand__title">One account for every event you go to.</p>
+        <p class="amt-brand__title">${brand.joinTitle}</p>
         <ul class="amt-points">
-          <li>Register for workshops, meetups and hackathons</li>
-          <li>Check in with the QR code on your ticket</li>
-          <li>Keep certificates anyone can verify</li>
+          <#list brand.points as point><li>${point}</li></#list>
         </ul>
       <#else>
-        <p class="amt-eyebrow">A Million Techies Community</p>
-        <p class="amt-brand__title">Learn. Build. Grow. <em>Together.</em></p>
-        <p class="amt-brand__lede">One A Million Techies account for workshops, meetups and hackathons, where learners and mentors build together.</p>
+        <p class="amt-eyebrow">${brand.eyebrow}</p>
+        <p class="amt-brand__title">${brand.title} <em>${brand.titleEm}</em></p>
+        <p class="amt-brand__lede">${brand.lede}</p>
       </#if>
     </div>
     <div class="amt-pass">
       <div>
-        <p class="amt-pass__label">Community pass</p>
+        <p class="amt-pass__label">${brand.pass}</p>
         <p class="amt-pass__value">Admit one</p>
       </div>
       <div class="amt-pass__code"><#list [1,3,1,2,1,1,3,2,1,2,3,1,1,2,1,3,1,2,2,1,3,1] as w><span style="width:${w}px"></span></#list></div>
@@ -186,10 +222,10 @@
   <div class="amt-panel">
     <div class="amt-panel__top">
       <#if homeUrl?has_content>
-        <a class="amt-logo" href="${homeUrl}"><span class="amt-logo__mark"><i></i></span><span class="amt-logo__name">Community</span></a>
-        <a class="amt-back" href="${homeUrl}">&larr; Back to Community</a>
+        <a class="amt-logo" href="${homeUrl}"><span class="amt-logo__mark"><i></i></span><span class="amt-logo__name">${appName}</span></a>
+        <a class="amt-back" href="${homeUrl}">&larr; Back to ${appName}</a>
       <#else>
-        <span class="amt-logo"><span class="amt-logo__mark"><i></i></span><span class="amt-logo__name">Community</span></span>
+        <span class="amt-logo"><span class="amt-logo__mark"><i></i></span><span class="amt-logo__name">${appName}</span></span>
       </#if>
     </div>
     <main class="${properties.kcLoginMain!}">
