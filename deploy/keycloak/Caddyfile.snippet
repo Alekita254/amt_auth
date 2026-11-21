@@ -11,6 +11,10 @@ auth.amilliontechies.com {
 	@blocked path /admin /admin/ /admin/master/* /admin/amilliontechies/console* /admin/realms/master/* /realms/master/*
 	respond @blocked 404
 
+	# Keycloak sends `/` to the admin console, which only exists behind the tunnel
+	# (localhost:8080). Send visitors to their account page instead.
+	redir / /realms/amilliontechies/account/
+
 	# Caddy runs in Docker on PROXY_NETWORK, where Keycloak is `amt-keycloak`.
 	# (A Caddy installed on the host would use 127.0.0.1:8080 instead.)
 	reverse_proxy amt-keycloak:8080
