@@ -11,6 +11,7 @@ sign people in here and validate the tokens with [`amt-auth`](https://pypi.org/p
 | `Caddyfile.snippet` | The site block for the server's Caddy |
 | `.env.example` | Settings and secrets; copy to `.env` on the server |
 | `backup.sh` | Nightly database dump, copied off the server |
+| `deploy.sh` | Pull from GitHub, back up, rebuild, restart, rerun the realm setup, check |
 | `scripts/` | Realm setup, run inside the container (they are in the image at `/opt/keycloak/amt-scripts/`) |
 
 ## How the sites fit together
@@ -101,9 +102,34 @@ curl -m 5 http://<server-ip>:9000/  # fails
 ssh -L 8080:127.0.0.1:8080 <server>
 ```
 
-Then open http://localhost:8080/admin. The console's URLs point at
+Then open http://localhost:8080/admin. There are two realms:
+
+- **master**: admins only, for the admin console. No sign-up, not on the public URL.
+- **amilliontechies**: every member, shared by all products. `https://auth.amilliontechies.com`
+  opens its account page (profile, password, passkeys). Products send people to it
+  through their own client (`community-frontend`, ...).
+
+The setup script sets the master realm's Frontend URL to `KC_HOSTNAME_ADMIN`, so the
+console's sign-in check stays on the tunnel. Without it the console stops with
+"Timeout when waiting for 3rd party check iframe message". The console's URLs point at
 `http://localhost:8080` (`KC_HOSTNAME_ADMIN`), so if port 8080 is already busy on your
 machine, stop whatever is using it first.
+
+## Deploy updates
+
+After merging to the branch the server tracks, on the server:
+
+```bash
+/var/www/projects/amt-auth/deploy/keycloak/deploy.sh
+```
+
+It pulls (fast-forward only), backs up the database, builds the image from the
+checkout under the `KEYCLOAK_IMAGE` tag, runs `docker compose up -d`, waits until
+Keycloak is healthy, reruns `keycloak-prod-setup.sh` for `PRODUCTS`, and checks the
+public URL. The realm setup needs `PRODUCTS`, `KC_ADMIN_USER` and `KC_ADMIN_PASSWORD`
+in `.env`; without them that step is skipped. Create a dedicated master-realm user for
+it (e.g. `deploy-admin`, realm role `admin`). Skip steps with `--no-pull`,
+`--no-backup` or `--no-setup`.
 
 ## Add a product
 
