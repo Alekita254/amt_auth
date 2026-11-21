@@ -34,9 +34,8 @@ CONFIG="$(mktemp)"
 trap 'rm -f "$CONFIG"' EXIT
 kc() { local cmd=$1; shift; "$KEYCLOAK_HOME/bin/kcadm.sh" "$cmd" "$@" --config "$CONFIG"; }
 
-kc config credentials --server "$KEYCLOAK_URL" --realm master \
-  --user "${KC_ADMIN_USER:-${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}}" \
-  --password "${KC_ADMIN_PASSWORD:-${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}}"
+# shellcheck source=kc-login.sh
+. "$(dirname "$0")/kc-login.sh"
 
 auth=false
 [ -n "$SMTP_USER" ] && auth=true
