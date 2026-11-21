@@ -134,8 +134,12 @@ done
 
 CLIENT_ID='' VERIFY_EMAIL=true bash "$SCRIPTS/keycloak-realm-settings.sh"
 
-# The admin console's sign-in (master realm) uses the same theme.
-kc update realms/master -s loginTheme=amt
+# The admin console's sign-in (master realm) uses the same theme. The master realm
+# is only served through the SSH tunnel (Caddy answers 404 for it publicly), so its
+# URLs must point at the tunnel too; otherwise the console's login check loads from
+# the public host and fails with "Timeout when waiting for 3rd party check iframe".
+kc update realms/master -s loginTheme=amt \
+  -s "attributes.frontendUrl=${KC_HOSTNAME_ADMIN:-http://localhost:8080}"
 
 echo
 echo "Realm '$REALM' is ready at its issuer: \$KC_HOSTNAME/realms/$REALM"
