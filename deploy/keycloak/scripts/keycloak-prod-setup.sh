@@ -18,6 +18,9 @@
 #
 # No users are created. Configure email with keycloak-email.sh and Google with
 # keycloak-google.sh afterwards.
+#
+# HIDE_SECRETS=1 leaves new secrets out of the output (deploy.sh sets it when its
+# output goes to a log, such as GitHub Actions).
 set -euo pipefail
 
 : "${PRODUCTS:?Set PRODUCTS, e.g. PRODUCTS=\"community=https://community.amilliontechies.com\"}"
@@ -135,9 +138,13 @@ for product in $PRODUCTS; do
 
   echo "Product '$name': $name-frontend signs in from ${sites[*]}, $name-backend calls the Admin API."
   if [ "$backend_created" = 1 ]; then
-    secret="$(kc get "clients/$backend/client-secret" -r "$REALM" --fields value --format csv --noquotes)"
     echo "  AMT_CLIENT_ID=$name-backend"
-    echo "  AMT_CLIENT_SECRET=$secret   (shown once; store it in $name's backend env)"
+    if [ "${HIDE_SECRETS:-}" = 1 ]; then
+      echo "  AMT_CLIENT_SECRET: read it in the admin console, Clients > $name-backend > Credentials"
+    else
+      secret="$(kc get "clients/$backend/client-secret" -r "$REALM" --fields value --format csv --noquotes)"
+      echo "  AMT_CLIENT_SECRET=$secret   (shown once; store it in $name's backend env)"
+    fi
   fi
 done
 
@@ -186,8 +193,12 @@ if [ -z "$deploy_id" ]; then
   kc add-roles -r master --uusername service-account-amt-deploy --rolename admin
   # Without the kc-admin-api scope the Admin API answers 401.
   kc update "clients/$deploy_id/default-client-scopes/$(csv client-scopes -r master --fields id,name | grep ',kc-admin-api$' | cut -d, -f1)" -r master
-  echo "Created the amt-deploy service account. Put this in the server's .env:"
-  echo "  KC_ADMIN_CLIENT_SECRET=$(kc get "clients/$deploy_id/client-secret" -r master --fields value --format csv --noquotes)   (shown once)"
+  echo "Created the amt-deploy service account. Put its secret in the server's .env:"
+  if [ "${HIDE_SECRETS:-}" = 1 ]; then
+    echo "  KC_ADMIN_CLIENT_SECRET: read it in the admin console, master > Clients > amt-deploy > Credentials"
+  else
+    echo "  KC_ADMIN_CLIENT_SECRET=$(kc get "clients/$deploy_id/client-secret" -r master --fields value --format csv --noquotes)   (shown once)"
+  fi
 fi
 
 echo

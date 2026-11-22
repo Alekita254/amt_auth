@@ -1,0 +1,64 @@
+name: Deploy identity server
+
+# Deploys auth.amilliontechies.com whenever a merge to develop changes
+# deploy/keycloak/, or on demand from the Actions tab (Run workflow).
+#
+# It connects to the server over SSH with a key that can only run
+# deploy/keycloak/deploy.sh (a forced command in the server's authorized_keys), so
+# the deploy logic lives in deploy.sh and this file just starts it. A failure turns
+# the run red and GitHub emails whoever merged. The deploy.sh output is in the log.
+#
+# Setup (README.md, "Automatic deploys"):
+#   secrets    DEPLOY_SSH_KEY       private key of the forced-command key
+#              DEPLOY_KNOWN_HOSTS   ssh-keyscan -t ed25519 <server ip>
+#   variables  DEPLOY_HOST          server IP or hostname
+#              DEPLOY_USER          SSH user that owns the checkout (e.g. dev)
+
+on:
+  push:
+    branches: [develop]
+    paths: ["deploy/keycloak/**", ".github/workflows/deploy-keycloak.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a second merge waits for the first deploy to finish.
+concurrency:
+  group: deploy-keycloak-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Run deploy.sh on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          for name in SSH_KEY KNOWN_HOSTS DEPLOY_HOST DEPLOY_USER; do
+            [ -n "${!name}" ] || { echo "::error::$name is not set. See README.md, Automatic deploys."; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The server ignores the command and runs deploy.sh.
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" deploy
+
+      - name: Check the public site
+        run: |
+          base=https://auth.amilliontechies.com
+          issuer="$(curl -fsS "$base/realms/amilliontechies/.well-known/openid-configuration" | grep -o '"issuer":"[^"]*"')"
+          echo "issuer: $issuer"
+          [ "$issuer" = "\"issuer\":\"$base/realms/amilliontechies\"" ] || { echo "::error::Wrong or missing issuer"; exit 1; }
+          code="$(curl -s -o /dev/null -w '%{http_code}' "$base/admin/")"
+          [ "$code" = 404 ] || { echo "::error::$base/admin/ answered $code, expected 404"; exit 1; }
+          code="$(curl -s -o /dev/null -w '%{http_code}' https://auth-admin.amilliontechies.com/admin/master/console/)"
+          [ "$code" = 200 ] || { echo "::error::Admin console answered $code, expected 200"; exit 1; }
+          echo "Public checks passed."
