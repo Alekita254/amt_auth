@@ -1,5 +1,7 @@
 # Identity server: auth.amilliontechies.com
 
+[![Deploy identity server](https://github.com/MillionTechies/amt_auth/actions/workflows/deploy-keycloak.yml/badge.svg?branch=develop)](https://github.com/MillionTechies/amt_auth/actions/workflows/deploy-keycloak.yml)
+
 Keycloak and its PostgreSQL database, shared by every A Million Techies product
 (Community at `community.amilliontechies.com`, and later Learn, Events…). Products
 sign people in here and validate the tokens with [`amt-auth`](https://pypi.org/project/amt-auth/).
