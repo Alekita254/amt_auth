@@ -59,14 +59,11 @@ browser ──► community.amilliontechies.com ──(sign in)──► auth.am
    It prints `AMT_CLIENT_ID` and `AMT_CLIENT_SECRET` for each new backend. Put them in
    that product's backend env, together with `AMT_KEYCLOAK_URL=https://auth.amilliontechies.com`
    and `AMT_REALM=amilliontechies`. The frontend uses client `<product>-frontend`.
-5. **Email**: Keycloak sends verification and password-reset emails. Use the same Zoho
-   account Community uses, and check that SPF and DKIM are set up for amilliontechies.com:
-   ```bash
-   docker compose exec -T -e SMTP_HOST=smtp.zoho.com -e SMTP_PORT=587 \
-     -e SMTP_USER=info@amilliontechies.com -e SMTP_PASSWORD='...' \
-     -e SMTP_FROM=info@amilliontechies.com \
-     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-email.sh
-   ```
+5. **Email**: Keycloak sends verification and password-reset emails. Put the
+   `SMTP_*` settings in `.env` (the same Zoho account Community uses, see
+   `.env.example`); `deploy.sh` applies them on every deploy and checks the mail
+   server can be reached. SPF and DKIM for amilliontechies.com are already set up for
+   Zoho. To test, see "Test email" below.
 6. **Google sign-in**: in the Google OAuth client, add the redirect URI
    `https://auth.amilliontechies.com/realms/amilliontechies/broker/google/endpoint`, then:
    ```bash
@@ -149,7 +146,8 @@ Actions tab (**Deploy identity server → Run workflow**). A failed deploy turns
 red and GitHub emails whoever merged; the log has the full `deploy.sh` output.
 
 The run fails if the realm setup is skipped (`PRODUCTS` or `KC_ADMIN_CLIENT_SECRET`
-missing from `.env`). After deploying, it checks from outside that every product's
+missing from `.env`), if the `SMTP_*` settings are missing, or if the mail server
+can't be reached. After deploying, it checks from outside that every product's
 frontend client accepts a sign-in from each URL listed for it in `PRODUCTS`.
 
 GitHub signs in with its own SSH key, which the server only lets run `deploy.sh`.
@@ -172,6 +170,18 @@ One-time setup:
 `git pull` on the server must work without a prompt (an SSH key for GitHub without a
 passphrase, or HTTPS with a stored token). To stop automatic deploys, remove the
 `command=...` line from `~/.ssh/authorized_keys`.
+
+## Test email
+
+The deploy only checks that the mail server answers, not that the password is right.
+After changing the `SMTP_*` settings:
+
+1. In the admin console, **amilliontechies → Realm settings → Email → Test
+   connection**. It sends a test email to your admin user's own address (set one on
+   your master-realm user first). An error here is usually the password: with 2FA on
+   Zoho, use an app-specific password.
+2. On https://auth.amilliontechies.com, **Forgot password?** with your member email.
+   Check spam too.
 
 ## Add a product
 

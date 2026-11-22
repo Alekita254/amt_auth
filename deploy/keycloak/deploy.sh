@@ -9,7 +9,8 @@
 # 4. docker compose up -d, and waits until Keycloak is healthy
 # 5. reruns the realm setup (keycloak-prod-setup.sh) for PRODUCTS in .env,
 #    signing in with the amt-deploy service account (KC_ADMIN_CLIENT_SECRET), or
-#    the bootstrap admin on a fresh server
+#    the bootstrap admin on a fresh server, then applies the SMTP_* email settings
+#    (keycloak-email.sh)
 # 6. checks the public URL
 #
 # Options: --no-pull, --no-backup, --no-setup.
@@ -118,6 +119,26 @@ elif [ "$SETUP" = 1 ]; then
     echo "Retrying in 15 seconds..."
     sleep 15
   done
+fi
+
+# --- 5b. Email ---------------------------------------------------------------------
+if [ "$SETUP" = 1 ] && [ -z "$skip" ]; then
+  if [ -z "$(env_value SMTP_HOST)" ] || [ -z "$(env_value SMTP_FROM)" ]; then
+    if [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
+      echo "Email isn't set up: add the SMTP_* settings to .env (see .env.example)." >&2
+      exit 1
+    fi
+    echo "Skipping email: add the SMTP_* settings to .env (see .env.example)."
+  else
+    step "Updating the email settings"
+    smtp=()
+    for name in SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM SMTP_FROM_NAME SMTP_SSL SMTP_STARTTLS; do
+      value="$(env_value "$name")"
+      [ -z "$value" ] || smtp+=(-e "$name=$value")
+    done
+    docker compose exec -T "${smtp[@]}" -e "KC_ADMIN_CLIENT_SECRET=$CLIENT_SECRET" \
+      amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-email.sh
+  fi
 fi
 
 # --- 6. Check ----------------------------------------------------------------------
