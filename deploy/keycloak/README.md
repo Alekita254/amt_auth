@@ -139,6 +139,34 @@ public URL. The realm setup needs `PRODUCTS` and `KC_ADMIN_CLIENT_SECRET` (the
 `amt-deploy` service account) in `.env`; without them that step is skipped. Skip steps
 with `--no-pull`, `--no-backup` or `--no-setup`.
 
+## Automatic deploys
+
+`.github/workflows/deploy-keycloak.yml` runs `deploy.sh` on the server after every
+merge to develop that touches `deploy/keycloak/`, and can also be started from the
+Actions tab (**Deploy identity server → Run workflow**). A failed deploy turns the run
+red and GitHub emails whoever merged; the log has the full `deploy.sh` output.
+
+GitHub signs in with its own SSH key, which the server only lets run `deploy.sh`.
+One-time setup:
+
+1. On the server, as the user that owns the checkout:
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C github-actions-deploy -f ~/.ssh/github-deploy
+   echo "command=\"/var/www/projects/amt-auth/deploy/keycloak/deploy.sh\",restrict $(cat ~/.ssh/github-deploy.pub)" >> ~/.ssh/authorized_keys
+   cat ~/.ssh/github-deploy      # copy into the DEPLOY_SSH_KEY secret, then:
+   rm ~/.ssh/github-deploy ~/.ssh/github-deploy.pub
+   ```
+2. From your machine: `ssh-keyscan -t ed25519 <server ip>`, the output goes into the
+   `DEPLOY_KNOWN_HOSTS` secret.
+3. In GitHub, **Settings → Secrets and variables → Actions**: secrets
+   `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS`; variables `DEPLOY_HOST` (server IP) and
+   `DEPLOY_USER` (e.g. `dev`).
+4. Run the workflow once by hand to check it.
+
+`git pull` on the server must work without a prompt (an SSH key for GitHub without a
+passphrase, or HTTPS with a stored token). To stop automatic deploys, remove the
+`command=...` line from `~/.ssh/authorized_keys`.
+
 ## Add a product
 
 Run the setup script again with every product listed. Existing clients are updated,

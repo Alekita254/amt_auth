@@ -13,6 +13,10 @@
 # 6. checks the public URL
 #
 # Options: --no-pull, --no-backup, --no-setup.
+#
+# GitHub Actions runs this after every merge to develop
+# (.github/workflows/deploy-keycloak.yml), over an SSH key that can run nothing
+# else. When the output isn't a terminal, new secrets are left out of it.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -88,8 +92,10 @@ else
   step "Updating the realm and clients"
   # Keycloak reports healthy a little before its Admin API stops answering 503,
   # so give the setup a few tries. It is safe to run again.
+  hide=0
+  [ -t 1 ] || hide=1
   for attempt in 1 2 3 4 5; do
-    if docker compose exec -T -e "PRODUCTS=$PRODUCTS" -e "KC_ADMIN_CLIENT_SECRET=$CLIENT_SECRET" \
+    if docker compose exec -T -e "PRODUCTS=$PRODUCTS" -e "KC_ADMIN_CLIENT_SECRET=$CLIENT_SECRET" -e "HIDE_SECRETS=$hide" \
       amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh; then
       break
     fi
