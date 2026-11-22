@@ -55,4 +55,12 @@ kc update "realms/$REALM" \
   -s resetPasswordAllowed=true \
   "${verify[@]}"
 
+# Saving the settings doesn't contact the server, so check it answers from here:
+# a blocked port or a wrong host would otherwise only show when an email goes missing.
+# shellcheck disable=SC2016  # $1 and $2 expand in the inner bash
+if ! timeout 10 bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "$SMTP_HOST" "$SMTP_PORT" 2>/dev/null; then
+  echo "Can't reach $SMTP_HOST:$SMTP_PORT from the server (blocked port or wrong host)." >&2
+  exit 1
+fi
+
 echo "Realm '$REALM' sends email through $SMTP_HOST:$SMTP_PORT as $SMTP_FROM."
