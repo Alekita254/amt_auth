@@ -366,6 +366,33 @@
     <p class="amt-legal">&copy; A Million Techies. Learn. Build. Grow.</p>
   </div>
 </div>
+<#if homeUrl?has_content>
+<script>
+  // A product can sign in from several sites (its own, plus e.g. localhost for its
+  // developers), but the client has one base URL. Link back to the site this sign-in
+  // came from instead: the redirect_uri's origin. Keycloak shows these pages only
+  // after checking redirect_uri against the client, except the error page, which
+  // never records one. Later pages (sign-up, wrong password) no longer have
+  // redirect_uri in their URL, so the origin is kept for this tab.
+  (function () {
+    var key = "amt-return-origin:${client.clientId?js_string}";
+    var origin = "";
+    try {
+      var uri = new URLSearchParams(location.search).get("redirect_uri");
+      if (uri && ${(pageId != "error")?c}) {
+        origin = new URL(uri).origin;
+        sessionStorage.setItem(key, origin);
+      } else {
+        origin = sessionStorage.getItem(key) || "";
+      }
+    } catch (e) {}
+    if (!/^https?:\/\//.test(origin)) return;
+    document.querySelectorAll("a.amt-logo, a.amt-back").forEach(function (a) {
+      a.href = origin + "/";
+    });
+  })();
+</script>
+</#if>
 </body>
 </html>
 </#macro>
