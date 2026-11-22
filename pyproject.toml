@@ -4,7 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amt-auth"
-version = "0.1.0"
+version = "0.2.1"
+description = "Keycloak authentication for the A Million Techies ecosystem: JWT validation, organization context and Django integration."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "A Million Techies" }]
+keywords = ["keycloak", "authentication", "jwt", "django", "oidc"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: Django",
+    "Operating System :: OS Independent",
+]
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27,<1.0",
@@ -18,11 +31,19 @@ django = [
 ]
 
 dev = [
+    "amt-auth[django]",
     "pytest>=8.3,<9.0",
+    "pytest-django>=4.8,<5.0",
     "pytest-httpx>=0.32,<1.0",
     "cryptography>=42.0,<44.0",
     "pytest-cov>=5.0,<7.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/MillionTechies/amt_auth"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src/amt_auth", "/tests", "/README.md", "/LICENSE"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amt_auth"]
@@ -30,3 +51,4 @@ packages = ["src/amt_auth"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+DJANGO_SETTINGS_MODULE = "tests.django_settings"

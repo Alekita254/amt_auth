@@ -2,20 +2,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
-@dataclass(frozen=True)
-class ClubRef:
-    id: str
-    name: str
-    university_id: str
+ADMINS_GROUP = "/admins"  # members of this group administer the organization
 
 
 @dataclass(frozen=True)
-class UniversityMembership:
+class GroupRef:
+    """A group inside an organization, as the token names it: by path."""
+
+    path: str  # e.g. "/clubs/Robotics Club"
+    organization_id: str
+
+    @property
+    def name(self) -> str:
+        return self.path.rsplit("/", 1)[-1]
+
+    @property
+    def kind(self) -> str | None:
+        """The top-level group it sits under, e.g. "clubs"; None if top-level itself."""
+        parts = self.path.strip("/").split("/")
+        return parts[0] if len(parts) > 1 else None
+
+
+@dataclass(frozen=True)
+class OrgMembership:
     id: str
-    name: str
-    roles: tuple[str, ...]
-    clubs: tuple[ClubRef, ...]
+    alias: str
+    groups: tuple[GroupRef, ...]
+
+    @property
+    def is_admin(self) -> bool:
+        return any(g.path == ADMINS_GROUP for g in self.groups)
 
 
 @dataclass(frozen=True)
@@ -27,8 +43,8 @@ class TokenClaims:
     family_name: str | None
     realm_roles: frozenset[str]
     client_roles: frozenset[str]
-    memberships: tuple[UniversityMembership, ...]
-    active_university: UniversityMembership | None
+    memberships: tuple[OrgMembership, ...]
+    active_organization: OrgMembership | None
     raw: dict
 
     @classmethod
@@ -46,16 +62,27 @@ class TokenClaims:
             payload.get("resource_access", {}).get(client_id, {}).get("roles", [])
         )
 
-        # organization claim: {"<org_id>": {"name": "...", "roles": [...]}}
-        org_map: dict = payload.get("organization", {})
-        memberships = tuple(
-            UniversityMembership(
-                id=org_id,
-                name=attrs.get("name", ""),
-                roles=tuple(attrs.get("roles", [])),
-                clubs=(),  # clubs come from org groups; not present in the base token
+        # Keycloak's organization claim, with "Add organization id" enabled and the
+        # organization group mapper added:
+        #   {"<alias>": {"id": "<org id>", "groups": ["/clubs/Robotics Club"]}}
+        org_claim = payload.get("organization") or {}
+        if not isinstance(org_claim, dict) or not all(
+            isinstance(attrs, dict) and attrs.get("id") for attrs in org_claim.values()
+        ):
+            raise InvalidTokenError(
+                "Token 'organization' claim carries no organization IDs. Enable "
+                "'Add organization id' on the realm's organization mapper."
             )
-            for org_id, attrs in org_map.items()
+        memberships = tuple(
+            OrgMembership(
+                id=attrs["id"],
+                alias=alias,
+                groups=tuple(
+                    GroupRef(path=path, organization_id=attrs["id"])
+                    for path in attrs.get("groups", [])
+                ),
+            )
+            for alias, attrs in org_claim.items()
         )
 
         return cls(
@@ -67,6 +94,6 @@ class TokenClaims:
             realm_roles=realm_roles,
             client_roles=client_roles,
             memberships=memberships,
-            active_university=memberships[0] if memberships else None,
+            active_organization=memberships[0] if memberships else None,
             raw=payload,
         )

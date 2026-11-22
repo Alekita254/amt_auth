@@ -79,3 +79,74 @@ def test_500_raises(httpx_mock: HTTPXMock, amt_env):
     with pytest.raises(AdminAPIError) as exc_info:
         client.get_organization("boom")
     assert exc_info.value.status_code == 500
+
+
+def test_create_organization_returns_id(httpx_mock: HTTPXMock, amt_env):
+    client = _client(amt_env, httpx_mock)
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{ADMIN_BASE}/organizations",
+        status_code=201,
+        headers={"Location": f"{ADMIN_BASE}/organizations/org-new"},
+        match_json={"name": "UoN", "alias": "uon", "domains": [{"name": "uonbi.ac.ke"}]},
+    )
+    assert client.create_organization("UoN", "uon", ["uonbi.ac.ke"]) == "org-new"
+
+
+def test_invite_org_member(httpx_mock: HTTPXMock, amt_env):
+    client = _client(amt_env, httpx_mock)
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{ADMIN_BASE}/organizations/org-1/members/invite-user",
+        status_code=204,
+    )
+    client.invite_org_member("org-1", "bob@example.com", "Bob", "Otieno")
+    body = httpx_mock.get_requests()[-1].content.decode()
+    assert "email=bob%40example.com" in body
+    assert "firstName=Bob" in body
+
+
+def test_add_org_member(httpx_mock: HTTPXMock, amt_env):
+    client = _client(amt_env, httpx_mock)
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{ADMIN_BASE}/organizations/org-1/members",
+        status_code=201,
+        match_json="user-1",
+    )
+    client.add_org_member("org-1", "user-1")
+
+
+def test_write_conflict_raises(httpx_mock: HTTPXMock, amt_env):
+    client = _client(amt_env, httpx_mock)
+    httpx_mock.add_response(
+        method="POST", url=f"{ADMIN_BASE}/organizations", status_code=409
+    )
+    with pytest.raises(AdminAPIError) as exc:
+        client.create_organization("UoN", "uon")
+    assert exc.value.status_code == 409
+
+
+def test_list_org_groups_children_and_members(httpx_mock: HTTPXMock, amt_env):
+    client = _client(amt_env, httpx_mock)
+    base = f"{ADMIN_BASE}/organizations/org-1/groups"
+    httpx_mock.add_response(url=f"{base}?first=0&max=100", json=[{"id": "g-clubs"}])
+    httpx_mock.add_response(
+        url=f"{base}/g-clubs/children?first=0&max=100", json=[{"id": "g-robo"}]
+    )
+    httpx_mock.add_response(
+        url=f"{base}/g-robo/members?first=0&max=100", json=[{"id": "alice"}]
+    )
+    assert client.list_org_groups("org-1") == [{"id": "g-clubs"}]
+    assert client.list_org_group_children("org-1", "g-clubs") == [{"id": "g-robo"}]
+    assert client.list_org_group_members("org-1", "g-robo") == [{"id": "alice"}]
+
+
+def test_lists_follow_pagination(httpx_mock: HTTPXMock, amt_env):
+    client = _client(amt_env, httpx_mock)
+    base = f"{ADMIN_BASE}/organizations/org-1/members"
+    httpx_mock.add_response(
+        url=f"{base}?first=0&max=100", json=[{"id": f"u{i}"} for i in range(100)]
+    )
+    httpx_mock.add_response(url=f"{base}?first=100&max=100", json=[{"id": "u100"}])
+    assert len(client.list_org_members("org-1")) == 101
