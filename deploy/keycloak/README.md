@@ -179,7 +179,9 @@ After changing the `SMTP_*` settings:
 1. In the admin console, **amilliontechies → Realm settings → Email → Test
    connection**. It sends a test email to your admin user's own address (set one on
    your master-realm user first). An error here is usually the password: with 2FA on
-   Zoho, use an app-specific password.
+   Zoho, use an app-specific password. Zoho's "554 5.7.8 Access Restricted" means the
+   host doesn't match the plan: `smtp.zoho.com` for free plans, `smtppro.zoho.com`
+   for paid ones.
 2. On https://auth.amilliontechies.com, **Forgot password?** with your member email.
    Check spam too.
 
