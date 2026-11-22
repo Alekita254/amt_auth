@@ -148,6 +148,10 @@ merge to develop that touches `deploy/keycloak/`, and can also be started from t
 Actions tab (**Deploy identity server → Run workflow**). A failed deploy turns the run
 red and GitHub emails whoever merged; the log has the full `deploy.sh` output.
 
+The run fails if the realm setup is skipped (`PRODUCTS` or `KC_ADMIN_CLIENT_SECRET`
+missing from `.env`). After deploying, it checks from outside that every product's
+frontend client accepts a sign-in from each URL listed for it in `PRODUCTS`.
+
 GitHub signs in with its own SSH key, which the server only lets run `deploy.sh`.
 One-time setup:
 

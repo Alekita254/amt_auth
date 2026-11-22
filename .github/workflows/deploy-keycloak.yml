@@ -47,9 +47,11 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          # The server ignores the command and runs deploy.sh.
+          # The server ignores the command and runs deploy.sh. Its log is kept for the
+          # client check below.
+          set -o pipefail
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" deploy
+            -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" deploy | tee "$RUNNER_TEMP/deploy.log"
 
       - name: Check the public site
         run: |
@@ -62,3 +64,29 @@ jobs:
           code="$(curl -s -o /dev/null -w '%{http_code}' https://auth-admin.amilliontechies.com/admin/master/console/)"
           [ "$code" = 200 ] || { echo "::error::Admin console answered $code, expected 200"; exit 1; }
           echo "Public checks passed."
+
+      # For every product URL in the server's PRODUCTS (deploy.sh prints them as
+      # `client: <client> <url>...`), start a sign-in that returns to it. Keycloak
+      # shows the login form only if that URL is registered for the client;
+      # otherwise it answers "Invalid parameter: redirect_uri".
+      - name: Check each product can sign in
+        run: |
+          grep -q '^client: ' "$RUNNER_TEMP/deploy.log" || { echo "::error::deploy.sh listed no products (PRODUCTS in the server's .env)"; exit 1; }
+          failed=0
+          while read -r _ client urls; do
+            for url in $urls; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --get \
+                https://auth.amilliontechies.com/realms/amilliontechies/protocol/openid-connect/auth \
+                --data-urlencode "client_id=$client" --data-urlencode response_type=code \
+                --data-urlencode scope=openid --data-urlencode "redirect_uri=${url%/}/" \
+                --data-urlencode code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM \
+                --data-urlencode code_challenge_method=S256)"
+              if [ "$code" = 200 ]; then
+                echo "$client signs in from $url"
+              else
+                echo "::error::$client can't sign in from $url (login page answered $code)"
+                failed=1
+              fi
+            done
+          done < <(grep '^client: ' "$RUNNER_TEMP/deploy.log")
+          exit "$failed"
