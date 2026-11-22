@@ -16,7 +16,9 @@
 #
 # GitHub Actions runs this after every merge to develop
 # (.github/workflows/deploy-keycloak.yml), over an SSH key that can run nothing
-# else. When the output isn't a terminal, new secrets are left out of it.
+# else. When the output isn't a terminal, new secrets are left out of it. When
+# GitHub runs it (SSH_ORIGINAL_COMMAND is set), a skipped realm setup is an error,
+# and it ends with a `client:` line per product that the workflow checks from outside.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -82,13 +84,23 @@ echo "Keycloak is healthy."
 # --- 5. Realm setup ----------------------------------------------------------------
 PRODUCTS="$(env_value PRODUCTS)"
 CLIENT_SECRET="$(env_value KC_ADMIN_CLIENT_SECRET)"
+skip=""
 if [ "$SETUP" = 0 ]; then
   :
 elif [ -z "$PRODUCTS" ]; then
-  echo "Skipping the realm setup: set PRODUCTS in .env to run it on every deploy."
+  skip="set PRODUCTS in .env to run it on every deploy."
 elif [ -z "$CLIENT_SECRET" ] && [ -z "$(env_value KC_BOOTSTRAP_ADMIN_USERNAME)" ]; then
-  echo "Skipping the realm setup: set KC_ADMIN_CLIENT_SECRET in .env (the amt-deploy secret)."
-else
+  skip="set KC_ADMIN_CLIENT_SECRET in .env (the amt-deploy secret)."
+fi
+if [ -n "$skip" ]; then
+  # By hand that's a warning; from GitHub it fails the run, or the clients could
+  # quietly stay out of date behind a green deploy.
+  if [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
+    echo "The realm setup can't run: $skip" >&2
+    exit 1
+  fi
+  echo "Skipping the realm setup: $skip"
+elif [ "$SETUP" = 1 ]; then
   step "Updating the realm and clients"
   # Keycloak reports healthy a little before its Admin API stops answering 503,
   # so give the setup a few tries. It is safe to run again.
@@ -118,6 +130,12 @@ if [ -z "$issuer" ] || [ "$admin_code" != 404 ]; then
   echo "Check failed." >&2
   exit 1
 fi
+
+# One line per product for the workflow: the frontend client and every URL it
+# should sign in from.
+for product in $PRODUCTS; do
+  echo "client: ${product%%=*}-frontend ${product#*=}" | tr , ' '
+done
 
 echo
 echo "Done: $(git log -1 --format='%h %s')"
