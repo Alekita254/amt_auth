@@ -1,0 +1,42 @@
+# Add to the server's Caddyfile, then `caddy reload` (or reload the Caddy container).
+# Cloudflare DNS for both hostnames is DNS-only, so Caddy obtains the certificates
+# itself.
+#
+# Two sites, one Keycloak:
+#   auth.amilliontechies.com        members: sign-in, sign-up, account page, and the
+#                                   amilliontechies realm's Admin REST API for product
+#                                   backends (which rejects anything without a token)
+#   auth-admin.amilliontechies.com  the admin console and the master realm only
+#                                   (KC_HOSTNAME_ADMIN). Admins sign in with a password
+#                                   and an authenticator-app code.
+auth.amilliontechies.com {
+	@blocked path /admin /admin/ /admin/master/* /admin/amilliontechies/console* /admin/realms/master/* /realms/master/*
+	respond @blocked 404
+
+	# Keycloak sends `/` to the admin console, which lives on the admin hostname.
+	# Send visitors to their account page instead.
+	redir / /realms/amilliontechies/account/
+
+	# Caddy runs in Docker on PROXY_NETWORK, where Keycloak is `amt-keycloak`.
+	# (A Caddy installed on the host would use 127.0.0.1:8080 instead.)
+	reverse_proxy amt-keycloak:8080
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+}
+
+auth-admin.amilliontechies.com {
+	# The console, its Admin API calls, the master realm's sign-in, and static files.
+	# Members' pages (/realms/amilliontechies/...) stay on auth.amilliontechies.com.
+	@console path /admin /admin/* /realms/master/* /resources/*
+	handle @console {
+		reverse_proxy amt-keycloak:8080
+	}
+	handle / {
+		redir * /admin/master/console/
+	}
+	handle {
+		respond 404
+	}
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+}
