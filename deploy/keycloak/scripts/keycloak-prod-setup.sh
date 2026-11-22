@@ -7,9 +7,12 @@
 #     -e PRODUCTS="community=https://community.amilliontechies.com" \
 #     amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
 #
-# PRODUCTS is a space-separated list of name=URL. Each product gets:
-#   <name>-frontend  public client (PKCE), sign-in only from URL
+# PRODUCTS is a space-separated list of name=URL[,URL...]. Each product gets:
+#   <name>-frontend  public client (PKCE), sign-in only from its URLs
 #   <name>-backend   confidential client whose service account calls the Admin API
+# The first URL is the product's site. Any others are extra places its web app
+# may sign in from, such as developers' machines:
+#   community=https://community.amilliontechies.com,http://localhost:5173
 # A backend's secret is printed once, when the client is created. To read it
 # again: Clients > <name>-backend > Credentials in the admin console.
 #
@@ -87,12 +90,21 @@ upsert_client() {
 
 for product in $PRODUCTS; do
   name="${product%%=*}"
-  url="${product#*=}"
-  url="${url%/}"
-  if [ "$name" = "$product" ] || [[ ! "$url" =~ ^https?://[^/*]+$ ]]; then
-    echo "Skipping '$product': expected name=https://host (no path, no wildcard)." >&2
+  IFS=, read -r -a sites <<<"${product#*=}"
+  sites=("${sites[@]%/}")
+  url="${sites[0]}"
+  valid=1
+  [ "$name" != "$product" ] || valid=0
+  for site in "${sites[@]}"; do
+    [[ "$site" =~ ^https?://[^/*]+$ ]] || valid=0
+  done
+  if [ "$valid" = 0 ]; then
+    echo "Skipping '$product': expected name=https://host[,http://host:port] (no path, no wildcard)." >&2
     continue
   fi
+  redirects="$(printf '"%s/*",' "${sites[@]}")"
+  origins="$(printf '"%s",' "${sites[@]}")"
+  logouts="$(printf '%s/*##' "${sites[@]}")"
 
   # Backend: no browser sign-in, only its own service account.
   backend_created=0
@@ -107,21 +119,21 @@ for product in $PRODUCTS; do
     --rolename manage-organizations --rolename view-organizations \
     --rolename manage-users --rolename view-users --rolename query-users --rolename query-groups
 
-  # Frontend: public client with PKCE, allowed to redirect back to its own site only.
+  # Frontend: public client with PKCE, allowed to redirect back to its own URLs only.
   frontend="$(upsert_client "$name-frontend" \
     -s publicClient=true -s standardFlowEnabled=true \
     -s directAccessGrantsEnabled=false -s implicitFlowEnabled=false \
     -s "rootUrl=$url" -s "baseUrl=$url/" \
-    -s "redirectUris=[\"$url/*\"]" -s "webOrigins=[\"$url\"]" \
+    -s "redirectUris=[${redirects%,}]" -s "webOrigins=[${origins%,}]" \
     -s 'attributes."pkce.code.challenge.method"=S256' \
-    -s "attributes.\"post.logout.redirect.uris\"=$url/*")"
+    -s "attributes.\"post.logout.redirect.uris\"=${logouts%##}")"
   # Its tokens must be valid for its backend, which checks `aud` against AMT_CLIENT_ID.
   has_mapper "clients/$frontend" "$name-backend-audience" \
     || kc create "clients/$frontend/protocol-mappers/models" -r "$REALM" \
       -s name="$name-backend-audience" -s protocol=openid-connect -s protocolMapper=oidc-audience-mapper \
       -s "config.\"included.client.audience\"=$name-backend" -s 'config."access.token.claim"=true'
 
-  echo "Product '$name': $name-frontend signs in from $url, $name-backend calls the Admin API."
+  echo "Product '$name': $name-frontend signs in from ${sites[*]}, $name-backend calls the Admin API."
   if [ "$backend_created" = 1 ]; then
     secret="$(kc get "clients/$backend/client-secret" -r "$REALM" --fields value --format csv --noquotes)"
     echo "  AMT_CLIENT_ID=$name-backend"

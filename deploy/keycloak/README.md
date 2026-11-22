@@ -150,6 +150,17 @@ docker compose exec -T \
   amt-keycloak bash /opt/keycloak/amt-scripts/keycloak-prod-setup.sh
 ```
 
+A product's web app signs in only from the URLs listed for it. To let it sign in from
+somewhere else too, such as a staging site or developers' machines, add those URLs after
+its own, separated by commas:
+
+```bash
+PRODUCTS="community=https://community.amilliontechies.com,http://localhost:5173"
+```
+
+Put the same list in `.env` so `deploy.sh` keeps it. Listing a product again without a
+URL removes that URL from its client.
+
 ## Upgrade Keycloak or the theme
 
 1. In this repo, change the theme or bump `ARG KEYCLOAK_VERSION` in the `Dockerfile`
